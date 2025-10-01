@@ -1,0 +1,10 @@
+services:
+  frontend:
+    build: .
+    image: event-builder-frontend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+
+
