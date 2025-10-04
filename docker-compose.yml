@@ -5,6 +5,33 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    image: event-builder-backend
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017/eventsdb
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    volumes:
+      - backend_uploads:/data/uploads
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  backend_uploads:
 
 
 

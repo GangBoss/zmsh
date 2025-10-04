@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 
-export default function PageEditor({ page, onChange }) {
+export default function PageEditor({ page, onChange, images = [], pages = [] }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const livePreviewHtml = useMemo(() => {
     return `
       <style>
@@ -30,6 +31,21 @@ export default function PageEditor({ page, onChange }) {
     onChange({ ...page, [key]: value })
   }
 
+  function insertAtTextarea(id, text) {
+    const el = document.getElementById(id)
+    if (!el) return
+    const start = el.selectionStart || 0
+    const end = el.selectionEnd || 0
+    const before = el.value.slice(0, start)
+    const after = el.value.slice(end)
+    const next = before + text + after
+    update('html', next)
+    setTimeout(() => {
+      el.selectionStart = el.selectionEnd = start + text.length
+      el.focus()
+    })
+  }
+
   return (
     <div className="page-editor">
       <div className="editor-form">
@@ -47,7 +63,11 @@ export default function PageEditor({ page, onChange }) {
         </label>
         <label className="field">
           <span>HTML блоки</span>
-          <textarea rows={10} value={page.html} onChange={e => update('html', e.target.value)} placeholder="<p>Ваш HTML</p>"></textarea>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+            <ImagePicker images={images} onPick={url => insertAtTextarea('page_html_editor', `<img src=\"${url}\" alt=\"\" />`)} />
+            <PageLinkPicker pages={pages} onPick={id => insertAtTextarea('page_html_editor', `<a href=\"#/p/${encodeURIComponent(window.location.hash.split('/')[2] || '')}/${id}\">Ссылка на страницу</a>`)} />
+          </div>
+          <textarea id="page_html_editor" rows={10} value={page.html} onChange={e => update('html', e.target.value)} placeholder="<p>Ваш HTML</p>"></textarea>
         </label>
         <div className="grid-2">
           <label className="field">
@@ -61,9 +81,16 @@ export default function PageEditor({ page, onChange }) {
         </div>
       </div>
       <div className="preview-pane">
-        <div className="preview-header">Предпросмотр</div>
-        <iframe title="preview" className="preview-frame" sandbox="allow-same-origin" srcDoc={livePreviewHtml} />
+        <button onClick={() => setIsPreviewOpen(true)}>Открыть предпросмотр</button>
       </div>
+      {isPreviewOpen && (
+        <div className="modal-backdrop" onClick={() => setIsPreviewOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <button className="icon close" onClick={() => setIsPreviewOpen(false)}>✕</button>
+            <iframe title="preview" className="preview-frame" sandbox="allow-same-origin" srcDoc={livePreviewHtml} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -74,6 +101,72 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return escapeHtml(str).replaceAll('"', '&quot;')
+}
+
+function ImagePicker({ images, onPick }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Вставить изображение</button>
+      {open && (
+        <div className="modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <button className="icon close" onClick={() => setOpen(false)}>✕</button>
+            <div className="card-grid">
+              {images.map((url, idx) => (
+                <div key={idx} className="card image-card" onClick={() => { onPick(url); setOpen(false) }}>
+                  <div className="thumb" style={{ backgroundImage: `url(${url})` }} />
+                </div>
+              ))}
+            </div>
+            <UploadImageButton onUploaded={url => { onPick(url); setOpen(false) }} />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function UploadImageButton({ onUploaded }) {
+  async function onChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch('/api/uploads', { method: 'POST', body: form })
+    const data = await res.json()
+    if (data?.url) onUploaded(data.url)
+  }
+  return (
+    <label className="field">
+      <span>Загрузить изображение</span>
+      <input type="file" accept="image/*" onChange={onChange} />
+    </label>
+  )
+}
+
+function PageLinkPicker({ pages, onPick }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Вставить ссылку на страницу</button>
+      {open && (
+        <div className="modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <button className="icon close" onClick={() => setOpen(false)}>✕</button>
+            <div className="card-grid">
+              {pages.map(p => (
+                <div key={p.id} className="card" onClick={() => { onPick(p.id); setOpen(false) }}>
+                  <div className="thumb" style={{ backgroundImage: `url(${p.coverUrl || ''})` }} />
+                  <div className="card-title">{p.title || 'Без названия'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
 }
 
 

@@ -2,7 +2,7 @@ import React from 'react'
 
 export default function Tabs({ tabs, activeTab, onChange }) {
   return (
-    <div className="tabs">
+    <div className="tabs right">
       {tabs.map(t => (
         <button
           key={t.id}

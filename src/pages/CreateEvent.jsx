@@ -72,8 +72,31 @@ export default function CreateEvent() {
 
   function handleSubmit() {
     // Placeholder: send to backend later
-    console.log('Submit Event:', eventData)
-    alert('Данные мероприятия выведены в консоль. Интеграция с backend позже.')
+    const withId = { id: eventData.id || crypto.randomUUID(), ...eventData, updatedAt: Date.now() }
+    console.log('Submit Event:', withId)
+    fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(withId)
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(() => {
+        alert('Мероприятие сохранено')
+        window.location.hash = '#/admin/events'
+      })
+      .catch(() => {
+        // fallback to local
+        try {
+          const listRaw = localStorage.getItem('events_list')
+          const list = listRaw ? JSON.parse(listRaw) : []
+          const next = [withId, ...list.filter(e => e.id !== withId.id)]
+          localStorage.setItem('events_list', JSON.stringify(next))
+          alert('Мероприятие сохранено локально (offline)')
+          window.location.hash = '#/admin/events'
+        } catch {
+          alert('Не удалось сохранить мероприятие')
+        }
+      })
   }
 
   return (
@@ -105,25 +128,24 @@ export default function CreateEvent() {
       />
 
       {activeTab === 'pages' && (
-        <section className="pages">
-          <div className="pages-sidebar">
-            <div className="sidebar-header">
-              <h3>Страницы</h3>
-              <button onClick={handleAddPage}>+ Создать страницу</button>
-            </div>
-            <ul className="page-list">
-              {eventData.pages.map((p, idx) => (
-                <li key={p.id} className={idx === selectedPageIndex ? 'active' : ''}>
-                  <button onClick={() => setSelectedPageIndex(idx)}>{p.title || 'Без названия'}</button>
-                  <span className="spacer" />
-                  <button className="icon danger" title="Удалить" onClick={() => handleDeletePage(idx)}>✕</button>
-                </li>
-              ))}
-            </ul>
+        <section className="block-section">
+          <div className="section-header">
+            <div className="spacer" />
+            <button onClick={handleAddPage}>+ Создать страницу</button>
           </div>
-          <div className="pages-editor">
+          <div className="card-grid">
+            {eventData.pages.map((p, idx) => (
+              <div key={p.id} className={['card', idx === selectedPageIndex ? 'active' : ''].join(' ')} onClick={() => setSelectedPageIndex(idx)}>
+                <div className="thumb" style={{ backgroundImage: `url(${p.coverUrl || ''})` }} />
+                <div className="card-title">{p.title || 'Без названия'}</div>
+                <button className="icon danger remove" title="Удалить" onClick={(e) => { e.stopPropagation(); handleDeletePage(idx) }}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          <div className="editor-panel">
             {selectedPage ? (
-              <PageEditor page={selectedPage} onChange={handleUpdatePage} />
+              <PageEditor page={selectedPage} onChange={handleUpdatePage} images={eventData.images} pages={eventData.pages} />
             ) : (
               <div className="empty">Выберите страницу или создайте новую</div>
             )}
@@ -132,7 +154,10 @@ export default function CreateEvent() {
       )}
 
       {activeTab === 'styles' && (
-        <section className="styles">
+        <section className="block-section">
+          <div className="section-header">
+            <div className="spacer" />
+          </div>
           <label className="field">
             <span>CSS стили мероприятия</span>
             <textarea
@@ -148,8 +173,21 @@ export default function CreateEvent() {
       )}
 
       {activeTab === 'images' && (
-        <section className="images">
-          <p>Список загруженных изображений появится здесь после интеграции с backend.</p>
+        <section className="block-section">
+          <div className="section-header">
+            <div className="spacer" />
+            <button disabled>+ Загрузить изображение (позже)</button>
+          </div>
+          <div className="card-grid">
+            {(eventData.images || []).map((src, idx) => (
+              <div key={idx} className="card image-card">
+                <div className="thumb" style={{ backgroundImage: `url(${src})` }} />
+              </div>
+            ))}
+            {(!eventData.images || eventData.images.length === 0) && (
+              <div className="empty">Список изображений появится после загрузки</div>
+            )}
+          </div>
         </section>
       )}
     </div>
